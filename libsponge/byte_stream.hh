@@ -10,6 +10,11 @@
 //! and then no more bytes can be written.
 class ByteStream {
   private:
+    std::string buffer{};
+    size_t beg{0}, end{0};
+    bool empty{true}, end_of_input{false};
+
+    size_t written_bytes{0}, read_bytes{0};
     // Your code here -- add private members as necessary.
 
     // Hint: This doesn't need to be a sophisticated data structure at
@@ -18,6 +23,12 @@ class ByteStream {
     // different approaches.
 
     bool _error{};  //!< Flag indicating that the stream suffered an error.
+    bool push_byte(char c);
+    bool pop_byte(char &c);
+
+    bool is_full() const;
+
+    bool is_empty() const;
 
   public:
     //! Construct a stream with room for `capacity` bytes.
