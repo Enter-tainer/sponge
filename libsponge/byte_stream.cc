@@ -13,8 +13,9 @@ using namespace std;
 
 bool ByteStream::push_byte(char c) {
     if (!is_full()) {
-        int cur = (end++) % buffer.size();
-        end %= buffer.size();
+        size_t cur = end++;
+        end = end == buffer.size() ? 0 : end;
+        cur = cur == buffer.size() ? 0 : cur;
         buffer[cur] = c;
         ++written_bytes;
         empty = false;
@@ -24,8 +25,9 @@ bool ByteStream::push_byte(char c) {
 }
 bool ByteStream::pop_byte(char &c) {
     if (!is_empty()) {
-        int cur = (beg++) % buffer.size();
-        beg %= buffer.size();
+        size_t cur = (beg++) % buffer.size();
+        cur = cur == buffer.size() ? 0 : cur;
+        beg = beg == buffer.size() ? 0 : beg;
         c = buffer[cur];
         ++read_bytes;
         if (beg == end) {
@@ -55,6 +57,7 @@ size_t ByteStream::write(const string &data) {
 //! \param[in] len bytes will be copied from the output side of the buffer
 string ByteStream::peek_output(const size_t len) const {
     string res;
+    res.reserve(len);
     size_t peek_cnt = len > buffer.size() ? buffer.size() : len;
     for (size_t i = beg, c = 0; c < peek_cnt; ++i, i %= buffer.size(), ++c) {
         res.push_back(buffer[i]);
@@ -70,11 +73,14 @@ void ByteStream::pop_output(const size_t len) { this->read(len); }
 //! \returns a string
 std::string ByteStream::read(const size_t len) {
     string res;
+    res.reserve(len);
     size_t peek_cnt = len > buffer.size() ? buffer.size() : len;
-    for (size_t i = beg, c = 0; c < peek_cnt; ++i, i %= buffer.size(), ++c) {
+    for (size_t i = beg, c = 0; c < peek_cnt; ++c) {
         char t;
         pop_byte(t);
         res.push_back(t);
+        ++i;
+        i = i == buffer.size() ? 0 : i;
     }
     return res;
 }
