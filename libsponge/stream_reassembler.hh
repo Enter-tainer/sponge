@@ -4,6 +4,7 @@
 #include "byte_stream.hh"
 
 #include <cstdint>
+#include <set>
 #include <string>
 
 //! \brief A class that assembles a series of excerpts from a byte stream (possibly out of order,
@@ -14,6 +15,27 @@ class StreamReassembler {
 
     ByteStream _output;  //!< The reassembled in-order byte stream
     size_t _capacity;    //!< The maximum number of bytes
+    size_t _first_unread{0}, _first_unassembled{0}, _first_unacceptable;
+
+    bool _eof{false};
+
+    struct segment {
+        size_t len, idx;
+        std::string data;
+        bool operator<(const segment &rhs) const { return idx < rhs.idx; }
+    };
+
+    std::set<segment> segs{};
+
+    void add_new_seg(segment &new_seg, bool eof);
+
+    void process_overlap(segment &new_seg);
+
+    void merge_seg(segment &l, const segment &r);
+
+    void write_single_seg(const segment &seg);
+
+    void write_ready_data();
 
   public:
     //! \brief Construct a `StreamReassembler` that will store up to `capacity` bytes.
@@ -41,6 +63,7 @@ class StreamReassembler {
     //!
     //! \note If the byte at a particular index has been pushed more than once, it
     //! should only be counted once for the purpose of this function.
+
     size_t unassembled_bytes() const;
 
     //! \brief Is the internal state empty (other than the output stream)?
