@@ -24,13 +24,52 @@ class TCPSender {
     std::queue<TCPSegment> _segments_out{};
 
     //! retransmission timer for the connection
-    unsigned int _initial_retransmission_timeout;
+    unsigned int _initial_retransmission_timeout, _rto{}, _rt_cnt{}, _newest_ackno{};
+    int64_t _timer{};
+
+    bool _timer_enable{false};
+
+    std::vector<TCPSegment> _out_standing_segs;
 
     //! outgoing stream of bytes that have not yet been sent
     ByteStream _stream;
 
     //! the (absolute) sequence number for the next byte to be sent
     uint64_t _next_seqno{0};
+
+    void _receive_new_ack() {
+        _rto = _initial_retransmission_timeout;
+        _rt_cnt = 0;
+        if (!_out_standing_segs.empty()) {
+            _timer = _rto;
+        }
+    }
+
+    void _start_timer_if_not_running() {
+        if (!_timer_enable) {
+            _timer_enable = true;
+            _timer = _rto;
+        }
+    }
+
+    void _double_rto_and_start_timer() {
+        ++_rt_cnt;
+        _rto *= 2;
+        _start_timer_if_not_running();
+    }
+
+    // return true if timer expired
+    // if it is expired, stop the timer
+    bool _time_pass(unsigned int time) {
+        _timer -= time;
+        if (_timer < 0) {
+            _timer_enable = false;
+            return true;
+        }
+        return false;
+    }
+
+    void stop_timer() { _timer_enable = false; }
 
   public:
     //! Initialize a TCPSender
