@@ -28,11 +28,26 @@ void TCPSender::fill_window() {}
 
 //! \param ackno The remote receiver's ackno (acknowledgment number)
 //! \param window_size The remote receiver's advertised window size
-void TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_size) { DUMMY_CODE(ackno, window_size); }
+void TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_size) {
+    uint64_t abs_ackno = unwrap(ackno, _isn, _newest_ackno);  // FIXME: is it correct?
+    if (abs_ackno > _newest_ackno) {
+        _newest_ackno = abs_ackno;
+        for (auto i = _out_standing_segs.begin(); i != _out_standing_segs.end();) {
+            auto next = i + 1;
+            uint64_t last_byte_abs_seq_no =
+                i->length_in_sequence_space() + unwrap(i->header().seqno, _isn, _newest_ackno);  // FIXME: correct?
+            if (last_byte_abs_seq_no < _newest_ackno) {
+                _out_standing_segs.erase(i);
+                _receive_new_ack();
+                _timer_enable = !_out_standing_segs.empty();
+            }
+            i = next;
+        }
+    }
+    _window_size = window_size == 0 ? 1 : window_size;
+}
 
 //! \param[in] ms_since_last_tick the number of milliseconds since the last call to this method
 void TCPSender::tick(const size_t ms_since_last_tick) { DUMMY_CODE(ms_since_last_tick); }
-
-unsigned int TCPSender::consecutive_retransmissions() const { return {}; }
 
 void TCPSender::send_empty_segment() {}

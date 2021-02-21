@@ -24,7 +24,7 @@ class TCPSender {
     std::queue<TCPSegment> _segments_out{};
 
     //! retransmission timer for the connection
-    unsigned int _initial_retransmission_timeout, _rto{}, _rt_cnt{}, _newest_ackno{};
+    unsigned int _initial_retransmission_timeout, _rto{}, _rt_cnt{};
     int64_t _timer{};
 
     bool _timer_enable{false};
@@ -36,6 +36,9 @@ class TCPSender {
 
     //! the (absolute) sequence number for the next byte to be sent
     uint64_t _next_seqno{0};
+
+    // [ack, window_size + ack)
+    uint64_t _window_size{1}, _newest_ackno{};
 
     void _receive_new_ack() {
         _rto = _initial_retransmission_timeout;
@@ -108,7 +111,7 @@ class TCPSender {
     size_t bytes_in_flight() const;
 
     //! \brief Number of consecutive retransmissions that have occurred in a row
-    unsigned int consecutive_retransmissions() const;
+    unsigned int consecutive_retransmissions() const { return _rt_cnt; };
 
     //! \brief TCPSegments that the TCPSender has enqueued for transmission.
     //! \note These must be dequeued and sent by the TCPConnection,
