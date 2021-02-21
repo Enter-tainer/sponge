@@ -57,7 +57,10 @@ class TCPReceiver {
     //! the first byte that falls after the window (and will not be
     //! accepted by the receiver) and (b) the sequence number of the
     //! beginning of the window (the ackno).
-    size_t window_size() const { return _capacity - stream_out().buffer_size(); }
+    size_t window_size() const {
+        // return _capacity - stream_out().buffer_size();
+        return _reassembler.first_unaccepted() - _reassembler.first_unassembled();
+    }
     //!@}
 
     //! \brief number of bytes stored but not yet reassembled
