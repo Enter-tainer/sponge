@@ -19,6 +19,8 @@ class TCPReceiver {
 
     //! The maximum number of bytes we'll store.
     size_t _capacity;
+    bool _fin{false}, _syn{false};
+    uint64_t _isn{}, _checkpoint{};
 
   public:
     //! \brief Construct a TCP receiver
@@ -35,7 +37,15 @@ class TCPReceiver {
     //!
     //! This is the beginning of the receiver's window, or in other words, the sequence number
     //! of the first byte in the stream that the receiver hasn't received.
-    std::optional<WrappingInt32> ackno() const;
+    std::optional<WrappingInt32> ackno() const {
+        int acc = 1;
+        if (_reassembler.unassembled_bytes() == 0 && _fin)
+            acc++;
+        if (_syn) {
+            return {wrap(_reassembler.first_unassembled() + acc, WrappingInt32(_isn))};
+        }
+        return {};
+    };
 
     //! \brief The window size that should be sent to the peer
     //!
@@ -47,7 +57,7 @@ class TCPReceiver {
     //! the first byte that falls after the window (and will not be
     //! accepted by the receiver) and (b) the sequence number of the
     //! beginning of the window (the ackno).
-    size_t window_size() const;
+    size_t window_size() const { return _capacity - stream_out().buffer_size(); }
     //!@}
 
     //! \brief number of bytes stored but not yet reassembled
