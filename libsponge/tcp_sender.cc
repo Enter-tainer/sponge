@@ -1,6 +1,5 @@
 #include "tcp_sender.hh"
 
-#include "log_guard.hh"
 #include "tcp_config.hh"
 
 #include <iostream>
@@ -22,7 +21,9 @@ using namespace std;
 TCPSender::TCPSender(const size_t capacity, const uint16_t retx_timeout, const std::optional<WrappingInt32> fixed_isn)
     : _isn(fixed_isn.value_or(WrappingInt32{random_device()()}))
     , _initial_retransmission_timeout{retx_timeout}
-    , _stream(capacity) {}
+    , _stream(capacity) {
+    _rto = _initial_retransmission_timeout;
+}
 
 uint64_t TCPSender::bytes_in_flight() const {
     uint64_t res = 0;
@@ -34,7 +35,7 @@ uint64_t TCPSender::bytes_in_flight() const {
 
 void TCPSender::_send_segment(TCPSegment &seg) {
     LogGuard _l("_send_segment");
-    cerr << seg.header().summary() << "\n";
+    cerr << "sending" << seg.header().summary() << "\n";
     seg.header().seqno = wrap(_next_seqno, _isn);
     _next_seqno += seg.length_in_sequence_space();
     _segments_out.push(seg);
@@ -113,7 +114,9 @@ void TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_si
                 cerr << "erase outstanding seg" << i->header().summary() << "\n";
                 _out_standing_segs.erase(i);
                 _receive_new_ack();
-                _timer_enable = !_out_standing_segs.empty();
+                if (!_out_standing_segs.empty()) {
+                    _start_timer_if_not_running();
+                };
             } else {
                 i++;
             }
@@ -125,15 +128,17 @@ void TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_si
 
 //! \param[in] ms_since_last_tick the number of milliseconds since the last call to this method
 void TCPSender::tick(const size_t ms_since_last_tick) {
+    LogGuard _l("tick");
     bool expire = _time_pass(ms_since_last_tick);
     if (expire) {
         // expire
-        auto earliest = min_element(
+        auto earliest = *min_element(
             _out_standing_segs.begin(), _out_standing_segs.end(), [this](const TCPSegment &a, const TCPSegment &b) {
                 return unwrap(a.header().seqno, _isn, _newest_ackno) < unwrap(b.header().seqno, _isn, _newest_ackno);
             });
-        _out_standing_segs.push_back(*earliest);
-        if (_window_size != 0) {
+        cerr << "resending " << earliest.header().summary() << "\n";
+        _segments_out.push(earliest);
+        if (_window_size != 0 || earliest.header().syn) {
             _double_rto_and_start_timer();
         }
     }

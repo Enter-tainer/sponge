@@ -2,6 +2,7 @@
 #define SPONGE_LIBSPONGE_TCP_SENDER_HH
 
 #include "byte_stream.hh"
+#include "log_guard.hh"
 #include "tcp_config.hh"
 #include "tcp_segment.hh"
 #include "wrapping_integers.hh"
@@ -54,9 +55,13 @@ class TCPSender {
     }
 
     void _start_timer_if_not_running() {
+        LogGuard _l("start timer");
         if (!_timer_enable) {
+            std::cerr << "starting timer, timeout: " << _rto << "\n";
             _timer_enable = true;
             _timer = _rto;
+        } else {
+            std::cerr << "timer already started\n";
         }
     }
 
@@ -69,8 +74,11 @@ class TCPSender {
     // return true if timer expired
     // if it is expired, stop the timer
     bool _time_pass(unsigned int time) {
+        LogGuard _l("time pass");
+        std::cerr << time << " ms passed\n";
         _timer -= time;
-        if (_timer < 0) {
+        if (_timer <= 0) {
+            std::cerr << "expired\n";
             _timer_enable = false;
             return true;
         }
