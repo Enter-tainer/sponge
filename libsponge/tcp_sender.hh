@@ -29,7 +29,7 @@ class TCPSender {
 
     bool _timer_enable{false};
 
-    std::vector<TCPSegment> _out_standing_segs;
+    std::vector<TCPSegment> _out_standing_segs{};
 
     //! outgoing stream of bytes that have not yet been sent
     ByteStream _stream;
@@ -40,11 +40,16 @@ class TCPSender {
     // [ack, window_size + ack)
     uint64_t _window_size{1}, _newest_ackno{};
 
+    bool _syn_sent{false}, _fin_sent{false};
+
     void _receive_new_ack() {
         _rto = _initial_retransmission_timeout;
         _rt_cnt = 0;
         if (!_out_standing_segs.empty()) {
+            _timer_enable = true;
             _timer = _rto;
+        } else {
+            _timer_enable = false;
         }
     }
 
@@ -73,6 +78,10 @@ class TCPSender {
     }
 
     void stop_timer() { _timer_enable = false; }
+
+    uint64_t _get_free_space() { return _window_size - bytes_in_flight(); }
+
+    void _send_segment(TCPSegment &seg);
 
   public:
     //! Initialize a TCPSender
