@@ -39,7 +39,7 @@ class TCPSender {
     uint64_t _next_seqno{0};
 
     // [ack, window_size + ack)
-    uint64_t _window_size{1}, _newest_ackno{};
+    uint64_t _window_size{1}, _newest_ackno{}, _bytes_in_flight{};
 
     bool _syn_sent{false}, _fin_sent{false};
 
