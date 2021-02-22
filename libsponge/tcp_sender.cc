@@ -1,7 +1,9 @@
 #include "tcp_sender.hh"
 
+#include "log_guard.hh"
 #include "tcp_config.hh"
 
+#include <iostream>
 #include <random>
 
 // Dummy implementation of a TCP sender
@@ -31,14 +33,18 @@ uint64_t TCPSender::bytes_in_flight() const {
 }
 
 void TCPSender::_send_segment(TCPSegment &seg) {
+    LogGuard _l("_send_segment");
+    cerr << seg.header().summary() << "\n";
     seg.header().seqno = wrap(_next_seqno, _isn);
-    _next_seqno = seg.length_in_sequence_space();
+    _next_seqno += seg.length_in_sequence_space();
     _segments_out.push(seg);
     _out_standing_segs.push_back(seg);
     _start_timer_if_not_running();
 }
 void TCPSender::fill_window() {
+    LogGuard _l("filling window");
     if (!_syn_sent) {
+        cerr << "sending syn\n";
         _syn_sent = true;
         TCPSegment syn;
         syn.header().syn = true;
@@ -46,18 +52,22 @@ void TCPSender::fill_window() {
         return;
     }
     if (_syn_sent && !_out_standing_segs.empty() && _out_standing_segs.begin()->header().syn) {
+        cerr << "syn sent but not acked\n";
         // syn not acked
         return;
     }
     if (_stream.buffer_empty() && !_stream.eof()) {
+        cerr << "buffer is empty, waiting for new data\n";
         return;
     }
 
     if (_fin_sent) {
+        cerr << "fin is sent\n";
         return;
     }
 
     if (_window_size != 0) {
+        cerr << "window size != 0, sending data\n";
         while (_get_free_space()) {
             TCPSegment seg;
             size_t len = min(TCPConfig::MAX_PAYLOAD_SIZE, min(_stream.buffer_size(), _get_free_space()));
@@ -72,6 +82,7 @@ void TCPSender::fill_window() {
             }
         }
     } else if (_get_free_space() == 0) {
+        cerr << "0-window size\n";
         TCPSegment seg;
         if (_stream.eof()) {
             seg.header().fin = true;
@@ -87,22 +98,29 @@ void TCPSender::fill_window() {
 //! \param ackno The remote receiver's ackno (acknowledgment number)
 //! \param window_size The remote receiver's advertised window size
 void TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_size) {
+    LogGuard _l("ack_received");
     uint64_t abs_ackno = unwrap(ackno, _isn, _newest_ackno);  // FIXME: is it correct?
-    if (abs_ackno > _newest_ackno) {
+    cerr << "getting ackno: " << ackno << "\n";
+    cerr << "ackno's abs value: " << abs_ackno << "\n";
+    cerr << "current newest_ackno: " << _newest_ackno << "\n";
+    if (abs_ackno >= _newest_ackno) {
+        cerr << "update newest to current value\n";
         _newest_ackno = abs_ackno;
         for (auto i = _out_standing_segs.begin(); i != _out_standing_segs.end();) {
-            auto next = i + 1;
             uint64_t last_byte_abs_seq_no =
                 i->length_in_sequence_space() + unwrap(i->header().seqno, _isn, _newest_ackno);  // FIXME: correct?
-            if (last_byte_abs_seq_no < _newest_ackno) {
+            if (last_byte_abs_seq_no <= _newest_ackno) {
+                cerr << "erase outstanding seg" << i->header().summary() << "\n";
                 _out_standing_segs.erase(i);
                 _receive_new_ack();
                 _timer_enable = !_out_standing_segs.empty();
+            } else {
+                i++;
             }
-            i = next;
         }
     }
     _window_size = window_size;
+    fill_window();
 }
 
 //! \param[in] ms_since_last_tick the number of milliseconds since the last call to this method
