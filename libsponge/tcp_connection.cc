@@ -30,7 +30,6 @@ void TCPConnection::end_input_stream() {
         _sender.fill_window();
     }
     _write_segs(false);
-    s
 }
 
 void TCPConnection::connect() {
