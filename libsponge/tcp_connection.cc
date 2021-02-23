@@ -13,16 +13,31 @@ void DUMMY_CODE(Targs &&.../* unused */) {}
 using namespace std;
 
 size_t TCPConnection::write(const string &data) {
-    DUMMY_CODE(data);
-    return {};
+    size_t sz = _sender.stream_in().write(data);
+    if (_receive_syn) {
+        _sender.fill_window();
+    }
+    _write_segs(false);
+    return sz;
 }
 
 //! \param[in] ms_since_last_tick number of milliseconds since the last call to this method
 void TCPConnection::tick(const size_t ms_since_last_tick) { DUMMY_CODE(ms_since_last_tick); }
 
-void TCPConnection::end_input_stream() {}
+void TCPConnection::end_input_stream() {
+    _sender.stream_in().end_input();
+    if (_receive_syn) {
+        _sender.fill_window();
+    }
+    _write_segs(false);
+    s
+}
 
-void TCPConnection::connect() {}
+void TCPConnection::connect() {
+    _receive_syn = true;  // pretending that we have receive a syn, so we will send another syn.
+    _sender.fill_window();
+    _write_segs(false);
+}
 
 void TCPConnection::segment_received(const TCPSegment &seg) {
     if (!_active) {
