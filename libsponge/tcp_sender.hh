@@ -57,11 +57,11 @@ class TCPSender {
     void _start_timer_if_not_running() {
         LogGuard _l("start timer");
         if (!_timer_enable) {
-            std::cerr << "starting timer, timeout: " << _rto << "\n";
+            // std::cerr << "starting timer, timeout: " << _rto << "\n";
             _timer_enable = true;
             _timer = _rto;
         } else {
-            std::cerr << "timer already started\n";
+            // std::cerr << "timer already started\n";
         }
     }
 
@@ -75,10 +75,10 @@ class TCPSender {
     // if it is expired, stop the timer
     bool _time_pass(unsigned int time) {
         LogGuard _l("time pass");
-        std::cerr << time << " ms passed\n";
+        // std::cerr << time << " ms passed\n";
         _timer -= time;
         if (_timer <= 0) {
-            std::cerr << "expired\n";
+            // std::cerr << "expired\n";
             _timer_enable = false;
             return true;
         }

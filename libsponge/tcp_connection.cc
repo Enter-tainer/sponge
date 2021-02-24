@@ -25,7 +25,7 @@ size_t TCPConnection::write(const string &data) {
 void TCPConnection::tick(const size_t ms_since_last_tick) {
     LogGuard _l("tcp connection tick");
     if (!_active) {
-        cerr << "conn no longer active\n";
+        // cerr << "conn no longer active\n";
         return;
     }
     _time_since_last_segment_received += ms_since_last_tick;
@@ -58,7 +58,7 @@ void TCPConnection::connect() {
 void TCPConnection::segment_received(const TCPSegment &seg) {
     LogGuard _l("tcp connection segment_received");
     if (!_active) {
-        cerr << "conn no longer active\n";
+        // cerr << "conn no longer active\n";
         return;
     }
     _time_since_last_segment_received = 0;
@@ -66,12 +66,12 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
         _receive_syn = true;
     }
     if (seg.header().rst) {
-        cerr << "peer send rst to me\n";
+        // cerr << "peer send rst to me\n";
         _dirty_shutdown(false);
         // rst
     } else {
         if (!_receive_syn && seg.header().ack) {
-            cerr << "peer send ack before syn\n";
+            // cerr << "peer send ack before syn\n";
             return;
         }
         _receiver.segment_received(seg);
@@ -96,11 +96,11 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
 TCPConnection::~TCPConnection() {
     try {
         if (active()) {
-            cerr << "Warning: Unclean shutdown of TCPConnection\n";
+            // cerr << "Warning: Unclean shutdown of TCPConnection\n";
             _dirty_shutdown(true);
         }
     } catch (const exception &e) {
-        std::cerr << "Exception destructing TCP FSM: " << e.what() << std::endl;
+        // std::cerr << "Exception destructing TCP FSM: " << e.what() << std::endl;
     }
 }
 
@@ -123,7 +123,7 @@ void TCPConnection::_write_segs(bool with_rst) {
         _segments_out.push(seg);
     }
     if (_receiver.stream_out().input_ended() && !_sender.stream_in().eof()) {
-        cerr << "do not linger\n";
+        // cerr << "do not linger\n";
         _linger_after_streams_finish = false;
     }
     if (_receiver.stream_out().input_ended() && _sender.bytes_in_flight() == 0 && _sender.stream_in().eof()) {
