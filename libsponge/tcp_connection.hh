@@ -22,7 +22,7 @@ class TCPConnection {
     //! in case the remote TCPConnection doesn't know we've received its whole stream?
     bool _linger_after_streams_finish{true};
 
-    bool _active{true}, _receive_syn{false};
+    bool _active{true}, _receive_syn{false}, _window_becomes_zero{false};
 
     uint64_t _time_since_last_segment_received{};
 
