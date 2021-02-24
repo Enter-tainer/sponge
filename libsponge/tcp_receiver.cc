@@ -1,5 +1,7 @@
 #include "tcp_receiver.hh"
 
+#include <iostream>
+
 // Dummy implementation of a TCP receiver
 
 // For Lab 2, please replace with a real implementation that passes the
@@ -20,6 +22,7 @@ void TCPReceiver::segment_received(const TCPSegment &seg) {
         _isn = header.seqno.raw_value();
     }
     if (_syn && header.fin) {
+        cerr << "fin received" << endl;
         _fin = true;
     }
     uint64_t abs_seqno = unwrap(header.seqno, WrappingInt32(_isn), _checkpoint);

@@ -34,7 +34,8 @@ void TCPSender::_send_segment(TCPSegment &seg) {
     _segments_out.push(seg);
     _out_standing_segs.push_back(seg);
     _bytes_in_flight += seg.length_in_sequence_space();
-    cerr << "sending" << seg.header().summary() << " with data: " << seg.payload().copy() << "\n";
+    cerr << "sending" << seg.header().summary() << " with length: " << seg.payload().size()
+         << " with data: " << seg.payload().copy() << "\n";
     _start_timer_if_not_running();
 }
 void TCPSender::fill_window() {
@@ -101,7 +102,7 @@ void TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_si
     cerr << "getting ackno: " << ackno << "\n";
     cerr << "ackno's abs value: " << abs_ackno << "\n";
     cerr << "current newest_ackno: " << _newest_ackno << "\n";
-    if (abs_ackno >= _newest_ackno) {
+    if (abs_ackno >= _newest_ackno && abs_ackno <= _next_seqno) {
         cerr << "update newest to current value\n";
         _bytes_in_flight -= abs_ackno - _newest_ackno;
         _newest_ackno = abs_ackno;
@@ -109,7 +110,8 @@ void TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_si
             uint64_t last_byte_abs_seq_no =
                 i->length_in_sequence_space() + unwrap(i->header().seqno, _isn, _newest_ackno);  // FIXME: correct?
             if (last_byte_abs_seq_no <= _newest_ackno) {
-                cerr << "erase outstanding seg" << i->header().summary() << "\n";
+                cerr << "erase outstanding seg" << i->header().summary() << " with length: " << i->payload().size()
+                     << "\n";
                 _out_standing_segs.erase(i);
                 _receive_new_ack();
                 if (!_out_standing_segs.empty()) {
@@ -126,7 +128,8 @@ void TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_si
 
 //! \param[in] ms_since_last_tick the number of milliseconds since the last call to this method
 void TCPSender::tick(const size_t ms_since_last_tick) {
-    LogGuard _l("tick");
+    LogGuard _l("sender tick");
+    cerr << ms_since_last_tick << "ms passed\n";
     if (!_timer_enable) {
         cerr << "timer is disabled\n";
         return;

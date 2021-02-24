@@ -22,9 +22,25 @@ size_t TCPConnection::write(const string &data) {
 }
 
 //! \param[in] ms_since_last_tick number of milliseconds since the last call to this method
-void TCPConnection::tick(const size_t ms_since_last_tick) { DUMMY_CODE(ms_since_last_tick); }
+void TCPConnection::tick(const size_t ms_since_last_tick) {
+    LogGuard _l("tcp connection tick");
+    if (!_active) {
+        cerr << "conn no longer active\n";
+        return;
+    }
+    _time_since_last_segment_received += ms_since_last_tick;
+    _sender.tick(ms_since_last_tick);
+    if (_sender.consecutive_retransmissions() > TCPConfig::MAX_RETX_ATTEMPTS) {
+        _dirty_shutdown(true);
+    }
+    if (_receive_syn) {
+        _sender.fill_window();
+    }
+    _write_segs(false);
+}
 
 void TCPConnection::end_input_stream() {
+    LogGuard _l("tcp connection end_input_stream");
     _sender.stream_in().end_input();
     if (_receive_syn) {
         _sender.fill_window();
@@ -33,13 +49,16 @@ void TCPConnection::end_input_stream() {
 }
 
 void TCPConnection::connect() {
-    _receive_syn = true;  // pretending that we have receive a syn, so we will send another syn.
+    LogGuard _l("tcp connection connect");
+
     _sender.fill_window();
     _write_segs(false);
 }
 
 void TCPConnection::segment_received(const TCPSegment &seg) {
+    LogGuard _l("tcp connection segment_received");
     if (!_active) {
+        cerr << "conn no longer active\n";
         return;
     }
     _time_since_last_segment_received = 0;
@@ -47,8 +66,14 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
         _receive_syn = true;
     }
     if (seg.header().rst) {
+        cerr << "peer send rst to me\n";
+        _dirty_shutdown(false);
         // rst
     } else {
+        if (!_receive_syn && seg.header().ack) {
+            cerr << "peer send ack before syn\n";
+            return;
+        }
         _receiver.segment_received(seg);
         if (seg.header().ack) {
             _sender.ack_received(seg.header().ackno, seg.header().win);
@@ -68,8 +93,7 @@ TCPConnection::~TCPConnection() {
     try {
         if (active()) {
             cerr << "Warning: Unclean shutdown of TCPConnection\n";
-
-            // Your code here: need to send a RST segment to the peer
+            _dirty_shutdown(true);
         }
     } catch (const exception &e) {
         std::cerr << "Exception destructing TCP FSM: " << e.what() << std::endl;
@@ -77,6 +101,7 @@ TCPConnection::~TCPConnection() {
 }
 
 void TCPConnection::_write_segs(bool with_rst) {
+    LogGuard _l("tcp connection _write_segs");
     while (!_sender.segments_out().empty()) {
         TCPSegment seg = _sender.segments_out().front();
         _sender.segments_out().pop();
@@ -91,6 +116,7 @@ void TCPConnection::_write_segs(bool with_rst) {
         _segments_out.push(seg);
     }
     if (_receiver.stream_out().input_ended() && !_sender.stream_in().eof()) {
+        cerr << "do not linger\n";
         _linger_after_streams_finish = false;
     }
     if (_receiver.stream_out().input_ended() && _sender.bytes_in_flight() == 0 && _sender.stream_in().eof()) {
@@ -98,4 +124,19 @@ void TCPConnection::_write_segs(bool with_rst) {
             _active = false;
         }
     }
+}
+
+void TCPConnection::_dirty_shutdown(bool send_rst) {
+    if (send_rst) {
+        if (_receive_syn) {
+            _sender.fill_window();
+        }
+        if (_sender.segments_out().empty()) {
+            _sender.send_empty_segment();
+        }
+        _write_segs(true);
+    }
+    _sender.stream_in().set_error();
+    _receiver.stream_out().set_error();
+    _active = false;
 }

@@ -1,6 +1,7 @@
 #ifndef SPONGE_LIBSPONGE_TCP_FACTORED_HH
 #define SPONGE_LIBSPONGE_TCP_FACTORED_HH
 
+#include "log_guard.hh"
 #include "tcp_config.hh"
 #include "tcp_receiver.hh"
 #include "tcp_sender.hh"
@@ -26,6 +27,8 @@ class TCPConnection {
     uint64_t _time_since_last_segment_received{};
 
     void _write_segs(bool with_rst);
+
+    void _dirty_shutdown(bool send_rst);
 
   public:
     //! \name "Input" interface for the writer
