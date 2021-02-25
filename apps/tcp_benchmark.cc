@@ -33,9 +33,9 @@ void main_loop(const bool reorder) {
     TCPConnection x{config}, y{config};
 
     string string_to_send(len, 'x');
-    for (auto &ch : string_to_send) {
-        ch = rand();
-    }
+    // for (auto &ch : string_to_send) {
+    //     ch = rand();
+    // }
 
     Buffer bytes_to_send{string(string_to_send)};
     x.connect();
