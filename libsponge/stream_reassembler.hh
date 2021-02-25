@@ -15,7 +15,7 @@ class StreamReassembler {
 
     ByteStream _output;  //!< The reassembled in-order byte stream
     size_t _capacity;    //!< The maximum number of bytes
-    size_t _first_unread{0}, _first_unassembled{0}, _first_unacceptable;
+    size_t _first_unread{0}, _first_unassembled{0}, _first_unacceptable, _un_asmed{};
 
     bool _eof{false};
 

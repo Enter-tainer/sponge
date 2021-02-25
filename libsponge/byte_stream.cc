@@ -1,4 +1,7 @@
 #include "byte_stream.hh"
+
+#include <cstring>
+
 // Dummy implementation of a flow-controlled in-memory byte stream.
 
 // For Lab 0, please replace with a real implementation that passes the
@@ -11,100 +14,56 @@ void DUMMY_CODE(Targs &&.../* unused */) {}
 
 using namespace std;
 
-bool ByteStream::push_byte(char c) {
-    if (!is_full()) {
-        size_t cur = end++;
-        end = end == buffer.size() ? 0 : end;
-        cur = cur == buffer.size() ? 0 : cur;
-        buffer[cur] = c;
-        ++written_bytes;
-        empty = false;
-        return true;
-    }
-    return false;
-}
-bool ByteStream::pop_byte(char &c) {
-    if (!is_empty()) {
-        size_t cur = (beg++) % buffer.size();
-        cur = cur == buffer.size() ? 0 : cur;
-        beg = beg == buffer.size() ? 0 : beg;
-        c = buffer[cur];
-        ++read_bytes;
-        if (beg == end) {
-            empty = true;
-        }
-        return true;
-    }
-    return false;
-}
-
-bool ByteStream::is_full() const { return beg == end && !empty; }
-
-bool ByteStream::is_empty() const { return beg == end && empty; }
-ByteStream::ByteStream(const size_t capacity) {
-    buffer.resize(capacity);
-    fill(buffer.begin(), buffer.end(), 0);
-}
+ByteStream::ByteStream(const size_t capacity)
+    : bytes(""), cap(capacity), used_len(0), is_end(false), has_writen(0), has_read(0) {}
 
 size_t ByteStream::write(const string &data) {
-    size_t cnt = 0;
-    for (cnt = 0; !is_full() && cnt < data.length(); ++cnt) {
-        push_byte(data[cnt]);
-    }
-    return cnt;
+    size_t remain_cap = remaining_capacity();
+    if (remain_cap == 0)
+        return 0;
+    size_t write_len = min(remain_cap, data.length());
+    bytes.append(data, 0, write_len);
+    used_len += write_len;
+    has_writen += write_len;
+    return write_len;
 }
 
 //! \param[in] len bytes will be copied from the output side of the buffer
 string ByteStream::peek_output(const size_t len) const {
-    string res;
-    res.reserve(len);
-    size_t peek_cnt = len > buffer.size() ? buffer.size() : len;
-    for (size_t i = beg, c = 0; c < peek_cnt; ++i, i %= buffer.size(), ++c) {
-        res.push_back(buffer[i]);
-    }
-    return res;
+    size_t peek_len = min(len, used_len);
+    return bytes.substr(0, peek_len);
 }
 
 //! \param[in] len bytes will be removed from the output side of the buffer
-void ByteStream::pop_output(const size_t len) { this->read(len); }
+void ByteStream::pop_output(const size_t len) {
+    size_t pop_len = min(len, used_len);
+    bytes.erase(0, pop_len);
+    used_len -= pop_len;
+    has_read += pop_len;
+}
 
 //! Read (i.e., copy and then pop) the next "len" bytes of the stream
 //! \param[in] len bytes will be popped and returned
 //! \returns a string
 std::string ByteStream::read(const size_t len) {
-    string res;
-    res.reserve(len);
-    size_t peek_cnt = len > buffer.size() ? buffer.size() : len;
-    for (size_t i = beg, c = 0; c < peek_cnt; ++c) {
-        char t;
-        pop_byte(t);
-        res.push_back(t);
-        ++i;
-        i = i == buffer.size() ? 0 : i;
-    }
-    return res;
+    size_t read_len = min(len, used_len);
+    string ret = peek_output(read_len);
+    pop_output(read_len);
+    return ret;
 }
 
-void ByteStream::end_input() { end_of_input = true; }
+void ByteStream::end_input() { is_end = true; }
 
-bool ByteStream::input_ended() const { return end_of_input; }
+bool ByteStream::input_ended() const { return is_end; }
 
-size_t ByteStream::buffer_size() const { return buffer.size() - remaining_capacity(); }
+size_t ByteStream::buffer_size() const { return used_len; }
 
-bool ByteStream::buffer_empty() const { return is_empty(); }
+bool ByteStream::buffer_empty() const { return used_len == 0; }
 
-bool ByteStream::eof() const { return end_of_input && is_empty(); }
+bool ByteStream::eof() const { return is_end && used_len == 0; }
 
-size_t ByteStream::bytes_written() const { return written_bytes; }
+size_t ByteStream::bytes_written() const { return has_writen; }
 
-size_t ByteStream::bytes_read() const { return read_bytes; }
+size_t ByteStream::bytes_read() const { return has_read; }
 
-size_t ByteStream::remaining_capacity() const {
-    if (is_full()) {
-        return 0;
-    }
-    if (is_empty()) {
-        return buffer.size();
-    }
-    return buffer.size() - (end + buffer.size() - beg) % buffer.size();
-}
+size_t ByteStream::remaining_capacity() const { return cap - used_len; }

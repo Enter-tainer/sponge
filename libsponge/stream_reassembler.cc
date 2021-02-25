@@ -42,10 +42,12 @@ void StreamReassembler::process_overlap(segment &new_seg) {
         if ((new_seg.idx >= i->idx && new_seg.idx < i->idx + i->len) ||
             (i->idx >= new_seg.idx && i->idx < new_seg.idx + new_seg.len)) {
             merge_seg(new_seg, *i);
+            _un_asmed -= i->len;
             segs.erase(i);
         }
         i = next;
     }
+    _un_asmed += new_seg.len;
     segs.insert(new_seg);
 }
 
@@ -94,15 +96,10 @@ void StreamReassembler::write_single_seg(const segment &seg) {
 void StreamReassembler::write_ready_data() {
     while (!segs.empty() && segs.begin()->idx == _first_unassembled) {
         write_single_seg(*segs.begin());
+        _un_asmed -= segs.begin()->len;
         segs.erase(segs.begin());
     }
 }
-size_t StreamReassembler::unassembled_bytes() const {
-    size_t res = 0;
-    for (auto i : segs) {
-        res += i.len;
-    }
-    return res;
-}
+size_t StreamReassembler::unassembled_bytes() const { return _un_asmed; }
 
 bool StreamReassembler::empty() const { return unassembled_bytes() == 0; }
